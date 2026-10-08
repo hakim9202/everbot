@@ -1,17 +1,8 @@
 # Robot Work Allocation System
 
-Node.js / Next.js implementation of the **Everest Engineering** robot work allocation challenge.
+Node.js implementation of the **Everest Engineering** EverBot coding challenge (terminal + web).
 
-Allocate **Bravo**, **Charlie**, and **Delta** robots to client work-hour requests across four strategies:
-
-| Level | Strategy | Goal |
-|------:|----------|------|
-| 1 | Category distribution | Minimise excess hours; prefer multi-type fleets |
-| 2 | Cost optimisation | Minimise daily charging cost; compare to Level 1 |
-| 3 | Standby activation | Deploy warehouse robots only when active capacity is short |
-| 4 | Multi-client scaling | Serve largest requests first; deduct inventory sequentially |
-
-## Robot specs
+Allocate **Bravo**, **Charlie**, and **Delta** robots across four strategies.
 
 | Robot   | Hours/day | Daily cost |
 |---------|-----------|------------|
@@ -19,54 +10,56 @@ Allocate **Bravo**, **Charlie**, and **Delta** robots to client work-hour reques
 | Charlie | 5         | $3         |
 | Delta   | 8         | $4         |
 
-Constraints: each robot is used at most once per day; assigned hours must be ≥ requested hours.
+| Level | Strategy | Rule |
+|------:|----------|------|
+| 1 | Category distribution | ≥1 of each type; minimise excess hours |
+| 2 | Cost optimisation | Minimise charging cost; compare to Level 1 |
+| 3 | Standby activation | Warehouse robots for capacity deficit (cost-optimal) |
+| 4 | Multi-client scaling | Highest hours first; sequential inventory deduction |
 
 ## Run locally
 
 ```bash
 npm install
+
+# Web UI + API (uncommon port)
 npm run dev -- -p 43127
+
+# Terminal CLI (PDF primary surface)
+npm run cli
+
+# Tests (PDF examples + exact error strings)
+npm test
 ```
 
 Open [http://127.0.0.1:43127](http://127.0.0.1:43127).
-
-### Scripts
-
-| Command | Purpose |
-|---------|---------|
-| `npm run dev -- -p 43127` | Dev server on port 43127 |
-| `npm run build` | Production build |
-| `npm start -- -p 43127` | Serve production build |
-| `npm test` | Vitest unit tests (PDF examples + error strings) |
-| `npm run lint` | ESLint |
 
 ### API
 
 `POST /api/allocate`
 
 ```json
-{
-  "level": 2,
-  "bravo": 2,
-  "charlie": 3,
-  "delta": 2,
-  "hours": 20
-}
+{ "level": 2, "bravo": 2, "charlie": 3, "delta": 2, "hours": 20 }
 ```
 
-For Level 4, send `"hoursInput": "12, 16, 17, 10, 21"` instead of `hours`.
+Level 4: use `"hoursInput": "12, 16, 17, 10, 21"` instead of `hours`.
 
-## Project layout
+## PDF examples (verified in tests)
+
+- **L1** B2/C3/D2 @ 16h → B1+C1+D1  
+- **L2** B2/C3/D2 @ 20h → C1+D2, **$11** (L1 would be **$12**)  
+- **L2** B2/C2/D3 @ 6h → B2, **$4**  
+- **L3** B1/C1/D1 @ 21h → capacity 16, standby **Charlie×1 ($3)**
+
+## Layout
 
 ```
+src/lib/errors.ts       # Exact PDF error strings
 src/lib/robots.ts       # Specs & types
-src/lib/solver.ts       # Bounded brute-force allocator
+src/lib/solver.ts       # Bounded allocator
 src/lib/strategies.ts   # Levels 1–4
 src/app/api/allocate/   # JSON API
-src/components/         # UI
-tests/solver.test.ts    # Spec compliance tests
+src/components/         # Web UI
+scripts/cli.ts          # Terminal CLI
+tests/solver.test.ts
 ```
-
-## Example (Level 2 PDF case)
-
-Inventory `B:2 C:3 D:2`, request `20` hours → **Charlie: 1, Delta: 2**, 21 hours, **$11** (Level 1 would cost $12 for the diversity-preferring mix).

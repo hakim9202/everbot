@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         {
           status: "error",
           error: "Error: Work hours must be a positive integer.",
-        },
+        }, // PDF Invalid Input
         { status: 400 }
       );
     }

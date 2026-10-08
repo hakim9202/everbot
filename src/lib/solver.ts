@@ -1,3 +1,4 @@
+import { ERRORS } from "./errors";
 import {
   AllocationResult,
   Inventory,
@@ -7,26 +8,44 @@ import {
 
 export type Objective = "hours" | "cost";
 
+export interface SolveOptions {
+  /**
+   * Level 1: require ≥1 Bravo, ≥1 Charlie, and ≥1 Delta.
+   * Matches PDF “include multiple categories” + Impossible Allocation error.
+   */
+  requireAllCategories?: boolean;
+}
+
 /**
  * Bounded brute-force allocation solver.
- * - hours: minimise excess, then maximise category diversity (Level 1)
- * - cost: minimise charging cost, then minimise excess (Levels 2–4)
+ * - hours + requireAllCategories: Level 1 — all three types, minimise excess
+ * - cost: Levels 2–4 — minimise charging cost, then minimise excess
  */
 export function solveAllocation(
   requested: number,
   inventory: Inventory,
-  objective: Objective = "cost"
+  objective: Objective = "cost",
+  options: SolveOptions = {}
 ): AllocationResult {
   if (objective !== "hours" && objective !== "cost") {
     throw new Error(`Unknown objective: '${objective}'. Must be 'hours' or 'cost'.`);
   }
 
+  const requireAll = options.requireAllCategories === true;
+
   if (requested <= 0) {
-    return emptyAllocation("Error: Work hours must be a positive integer.");
+    return emptyAllocation(ERRORS.invalidHours);
   }
 
   if (inventory.Bravo + inventory.Charlie + inventory.Delta === 0) {
-    return emptyAllocation("Error: No robots available for assignment.");
+    return emptyAllocation(ERRORS.zeroRobots);
+  }
+
+  if (
+    requireAll &&
+    (inventory.Bravo < 1 || inventory.Charlie < 1 || inventory.Delta < 1)
+  ) {
+    return emptyAllocation(ERRORS.eachCategory);
   }
 
   const maxB = Math.min(
@@ -42,13 +61,17 @@ export function solveAllocation(
     Math.floor(requested / ROBOT_SPECS.Delta.hours) + 2
   );
 
+  const minB = requireAll ? 1 : 0;
+  const minC = requireAll ? 1 : 0;
+  const minD = requireAll ? 1 : 0;
+
   let best: AllocationResult | null = null;
   let bestExcess = Infinity;
   let bestTypes = -1;
 
-  for (let b = 0; b <= maxB; b++) {
-    for (let c = 0; c <= maxC; c++) {
-      for (let d = 0; d <= maxD; d++) {
+  for (let b = minB; b <= maxB; b++) {
+    for (let c = minC; c <= maxC; c++) {
+      for (let d = minD; d <= maxD; d++) {
         if (b === 0 && c === 0 && d === 0) continue;
 
         const hrs =
@@ -81,6 +104,7 @@ export function solveAllocation(
         }
 
         if (objective === "hours") {
+          // Minimise excess; tie-break by maximising category count
           if (
             excess < bestExcess ||
             (excess === bestExcess && types > bestTypes)
@@ -103,7 +127,7 @@ export function solveAllocation(
 
   if (!best) {
     return emptyAllocation(
-      "Error: Unable to allocate at least one robot from each category with the available inventory."
+      requireAll ? ERRORS.eachCategory : ERRORS.insufficientCapacity
     );
   }
 

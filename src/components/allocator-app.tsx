@@ -4,7 +4,11 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ROBOT_SPECS, type AllocationResult, type Inventory } from "@/lib/robots";
-import type { ClientAllocation, Level4Summary } from "@/lib/strategies";
+import type {
+  ClientAllocation,
+  Level4Summary,
+  StandbyOption,
+} from "@/lib/strategies";
 import { Bot, Loader2, Warehouse, Zap } from "lucide-react";
 
 type Level = 1 | 2 | 3 | 4;
@@ -25,6 +29,7 @@ interface ApiResponse {
   deficit?: number;
   sufficient?: boolean;
   standby?: AllocationResult | null;
+  standbyOptions?: StandbyOption[];
   inventory?: Inventory;
   allocations?: ClientAllocation[];
   summary?: Level4Summary;
@@ -34,7 +39,7 @@ const LEVELS: { id: Level; title: string; blurb: string }[] = [
   {
     id: 1,
     title: "Category distribution",
-    blurb: "Minimise excess hours; favour multi-type fleets.",
+    blurb: "Require all three types; minimise excess hours.",
   },
   {
     id: 2,
@@ -347,18 +352,36 @@ export function AllocatorApp() {
             </p>
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-slate-500">Active capacity</dt>
+                <dt className="text-slate-500">Active robot capacity</dt>
                 <dd className="font-mono text-lg text-slate-100">
-                  {result.maxActive}h
+                  {result.maxActive} hours
                 </dd>
               </div>
               <div>
-                <dt className="text-slate-500">Requested</dt>
+                <dt className="text-slate-500">Client work requested</dt>
                 <dd className="font-mono text-lg text-slate-100">
-                  {result.requested}h
+                  {result.requested} hours
                 </dd>
               </div>
             </dl>
+            {result.inventory && (
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-300">
+                  Active robots
+                </p>
+                <ul className="font-mono text-sm text-slate-200">
+                  {result.inventory.Bravo > 0 && (
+                    <li>Bravo: {result.inventory.Bravo}</li>
+                  )}
+                  {result.inventory.Charlie > 0 && (
+                    <li>Charlie: {result.inventory.Charlie}</li>
+                  )}
+                  {result.inventory.Delta > 0 && (
+                    <li>Delta: {result.inventory.Delta}</li>
+                  )}
+                </ul>
+              </div>
+            )}
             {result.sufficient ? (
               <p className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
                 Sufficient active capacity. No standby robots needed.
@@ -366,16 +389,33 @@ export function AllocatorApp() {
             ) : (
               <div className="space-y-3">
                 <p className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">
-                  Deficit: {result.deficit}h. Activating standby robots…
+                  Deficit: {result.deficit} hours. Activating standby robots…
                 </p>
-                {result.standby?.isValid && (
+                {result.standbyOptions && result.standbyOptions.length > 0 && (
                   <div>
                     <p className="mb-2 text-xs font-medium text-slate-300">
-                      Additional standby robots
+                      Additional standby robots required
+                    </p>
+                    <ul className="space-y-1 font-mono text-sm text-slate-300">
+                      {result.standbyOptions.map((opt, i) => (
+                        <li key={opt.type}>
+                          {i > 0 && (
+                            <span className="mr-1 text-slate-500">or</span>
+                          )}
+                          {opt.type}: {opt.count} - cost ${opt.cost}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {result.standby?.isValid && (
+                  <div className="rounded-lg border border-cyan-500/30 bg-cyan-950/20 px-3 py-2">
+                    <p className="text-xs font-medium text-cyan-300">
+                      Cost-optimised standby
                     </p>
                     <AssignmentList res={result.standby} />
-                    <p className="mt-2 font-mono text-sm text-slate-300">
-                      Standby cost: ${result.standby.totalCost}
+                    <p className="mt-1 font-mono text-sm text-slate-300">
+                      ${result.standby.totalCost}
                     </p>
                   </div>
                 )}
